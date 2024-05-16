@@ -16,7 +16,6 @@ def Server(args):
     
     INTENTIONAL_DROP = args.discard
     INTENTIONAL_DROP_ACK1 = False
-    INTENTIONAL_DROP_ACK2 = False
     
     TIMEOUT = 0.5
     
@@ -59,7 +58,7 @@ def Server(args):
                     #exp    the connection is all good.
                     print(bcolors.OKBLUE+'ACK packet is received\nConnection established\n'+bcolors.ENDC)
                     STATE = "ESTABLISHED"
-                    EXPECTED_PACKET = ackno
+                    EXPECTED_PACKET = 1
                     sock.settimeout(ORG_TIMEOUT)
                     start_time = time.time()
                     MY_SEQ = 0
@@ -93,16 +92,16 @@ def Server(args):
                     print(bcolors.WARNING+f' -- packet {seqno} is dropped'+bcolors.ENDC)
                     INTENTIONAL_DROP = False
                     continue
-                if seqno == EXPECTED_PACKET:
+                if seqno == EXPECTED_PACKET:#*Packet received IN-ORDER
                     print(bcolors.OKBLUE+getTimestamp()+f' -- packet {seqno} is received'+bcolors.ENDC)
                     print(bcolors.OKBLUE+getTimestamp()+f' -- sending ack for the received {seqno}'+bcolors.ENDC)
-                    EXPECTED_PACKET+=1
+                    EXPECTED_PACKET=seqno+1
                     MY_SEQ+=1
                     TOTAL_DATA += data
                 else:
                     print(bcolors.OKBLUE+getTimestamp()+f' -- out-of-order packet {seqno} is received'+bcolors.ENDC)
                 packet = create_packet(MY_SEQ,EXPECTED_PACKET,4,b'')
-                if seqno != False and seqno!=False:sock.sendto(packet,addr)#!drops ack
+                if seqno != 5 and seqno!=6 and seqno!=False:sock.sendto(packet,addr)#!drops ack
                 
             #TODO -------------------------------------------------------------------------------------------------------------------
             elif not syn and not ack and fin and not reset:
@@ -163,7 +162,8 @@ def Server(args):
                     sock.sendto(packet,addr)
                 else:raise timeout
             except timeout:
-                with open("../recPhoto.jpg",'bx') as f:
+                file = nextnonexistent("../Photo/recPhoto.jpg")
+                with open(file,'bx') as f:
                     f.write(TOTAL_DATA)
                     print('wrote Data to file')
                 TOTAL_DATASIZE = (len(TOTAL_DATA)*8)/10**6 # Byte*8 = bit -> bit /10^6 = Mb
@@ -172,8 +172,8 @@ def Server(args):
                 print(bcolors.OKBLUE+f'Transfertime:', round(end_time-start_time,3),'s',bcolors.ENDC)
                 print(bcolors.OKBLUE+f'The throughput is {Throughput} Mbps')
                 print(bcolors.OKBLUE+'Connection Closes\n'+bcolors.ENDC)
-                sock.close()
-                sys.exit()
+                #!sock.close()
+                #!sys.exit()
                 sock.settimeout(ORG_TIMEOUT)
                 STATE = "LISTEN"
                 print('-----------------------------------------------------------------------')

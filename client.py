@@ -24,7 +24,7 @@ def Client(args):
     Queue = deque()
     Window = deque()
     
-    TIMEOUT = 0.5
+    TIMEOUT = 0.2
     sock.settimeout(TIMEOUT)
     
     STATE = "CLOSED"
@@ -39,7 +39,6 @@ def Client(args):
             sock.sendto(packet, addr)     
             print(bcolors.OKBLUE+'SYN packet is sent'+bcolors.ENDC)
             STATE = "SYN_SENT"
-
 
 
         elif STATE == "SYN_SENT":
@@ -96,6 +95,9 @@ def Client(args):
                     print(bcolors.OKBLUE+'SYN packet is received\nSYN ACK packet is sent'+bcolors.ENDC)
                     STATE = "TEARDOWN"#exp same as a SYN_RCVD state, just under diff name
                 else: raise timeout
+            except ConnectionResetError:
+                print(bcolors.OKBLUE+'\nConnection Failed\n'+bcolors.ENDC)
+                break
             except timeout:
                 #exp    didnt get any response from my SYN packet :(.
                 #exp    probably packetloss, so will retransmitt the SYN packet
@@ -113,48 +115,50 @@ def Client(args):
             #   acknowledge/ackno - this is the next byte i expect from you
             #   flags - what kind of packet is this
             #TODO -----------------------------------------------------------------------------------------------------------------------------------------------------         
-            EXPECTED_PACKET = seqno +1
-            MY_SEQ = ackno
+            SEQ,EXPECTED_PACKET = 1,1
             try:
-                getPartFile = readFile(fileName)
-                for i in range(0,window_size):
-                    try:data = next(getPartFile)
+                getPart = readFile(args.file)
+                for SEQ in range(1, window_size+1): #*"number of packets = windowsize" is sent to the server to start with
+                    try:part = next(getPart)
                     except StopIteration:break
-                    packet = create_packet(MY_SEQ, EXPECTED_PACKET, 4, data)
+                    packet = create_packet(SEQ, EXPECTED_PACKET, 4, part)
                     Window.append(packet)
-                    sock.sendto(packet,addr)
+                    sock.sendto(packet, addr)
                     print(bcolors.OKBLUE+getTimestamp()+f' -- packet with seqno = {parse_header(Window[len(Window)-1])[0]} is sent, sliding window = {getWinSeq(Window)}'+bcolors.ENDC)
-                    MY_SEQ+=1            
             except FileNotFoundError:
-                print(f'{fileName} was not found')
-                STATE = "TEARDOWN"
+                print(f'{args.file} was not found')
+                STATE = "Teardown"
                 continue
             while Window:
                 try:
                     packet, addr = sock.recvfrom(1000)
                     seqno, ackno, flags = parse_header(packet)
                     syn, ack, fin, reset = parse_flags(flags)
-                    if ackno-1 >= EXPECTED_PACKET:
-                        print(bcolors.OKBLUE+getTimestamp()+f' -- ACK for packet {ackno-1} is received'+bcolors.ENDC)
-                        while EXPECTED_PACKET != ackno:
-                            EXPECTED_PACKET+=1
+                    if not syn and ack and not fin and not reset and ackno-1>= EXPECTED_PACKET:
+                        Acks = []
+                        while ackno-1 >= EXPECTED_PACKET:
+                            Acks.append(EXPECTED_PACKET)
+                            EXPECTED_PACKET+=1           
+                        print(bcolors.OKBLUE+getTimestamp()+f' -- ACK for packet', *Acks,'is received'+bcolors.ENDC)
+                        for i in range(0, len(Acks)): #*"number of packets = windowsize" is sent to the server to start with
                             Window.popleft()
-                        while len(Window)!=window_size:
-                            try:data = next(getPartFile)
+                            try:part = next(getPart)
                             except StopIteration:break
-                            packet = create_packet(MY_SEQ, EXPECTED_PACKET, 4, data)
-                            sock.sendto(packet, addr)
+                            SEQ+=1
+                            packet = create_packet(SEQ, EXPECTED_PACKET, 4, part)                            
                             Window.append(packet)
-                            print(bcolors.OKBLUE+getTimestamp()+f' -- packet with seqno = {parse_header(Window[len(Window)-1])[0]} is sent, sliding window = {getWinSeq(Window)}'+bcolors.ENDC)
-                            MY_SEQ+=1
-                    else:continue
+                            sock.sendto(packet, addr)
+                            print(bcolors.OKBLUE+getTimestamp()+f' -- packet with seqno = {SEQ} is sent, sliding window = {getWinSeq(Window)}'+bcolors.ENDC)
+                    else:continue#*fikk ikke pakken jeg ville. Timeout kommer kanskje
                 except timeout:
+                    #*resend packets in window
                     print(bcolors.OKBLUE+f'RTO occured'+bcolors.ENDC)
                     for packet in Window:
-                        tmp = parse_header(packet)
-                        new = create_packet(tmp[0], EXPECTED_PACKET, tmp[2], packet[6:])
-                        sock.sendto(new,addr)
-                        print(bcolors.OKBLUE+getTimestamp()+f' -- retransmitting packet with seq {parse_header(packet)[0]}'+bcolors.ENDC)
+                        seqno, ackno, flags = parse_header(packet)
+                        packet = create_packet(seqno, EXPECTED_PACKET, flags, packet[6:])
+                        sock.sendto(packet, addr)
+                        print(bcolors.OKBLUE+getTimestamp()+f' -- retransmitting packet with seq {seqno}'+bcolors.ENDC)
+                    pass
             #TODO -----------------------------------------------------------------------------------------------------------------------------------------------------          
             print(bcolors.OKBLUE+'\nDATA Finished\n\n'+bcolors.ENDC)            
             print(bcolors.OKBLUE+'Connection Teardown:\n'+bcolors.ENDC)
