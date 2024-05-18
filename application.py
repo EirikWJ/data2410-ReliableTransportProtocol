@@ -45,6 +45,19 @@ def fileValid(args):
     if not args.file and args.client:
         print('File is required')
         return False
+    #exp    checks if the file that is supposed to be sent 
+    #exp    exists so i dont have to check in the code. 
+    #exp    gives better readablilty
+    try:
+        if not args.server:
+            with open(args.file) as f:
+                pass
+    except FileNotFoundError:
+        print(f'{args.file} was not found')
+        return False
+    except IOError:
+        print(f'could not open file')
+        return False
     return True
 
 def discardValid(args):
@@ -66,7 +79,7 @@ def processInputs(args):#takes in the argument list
     if not discardValid(args): return 
     if not fileValid(args): return
 
-    print(f'\n[{mode.upper()}] the {mode} is running with IP adress = {args.ip} and port address = {args.port}\n\n')
+    print(f'\n[{mode.upper()}] Running with IP = {args.ip} and port = {args.port}\n\n')
     if args.server: Server(args)
     if args.client: Client(args)
 
