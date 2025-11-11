@@ -1,7 +1,8 @@
 # 105 - DATA2410 Reliable Transport Protocol - DRTP
 <!---
-This is a submission for the homeexam for candidate 105. The project is a simple reliable data transfer protocol, that provides reliable data delivery on top of UDP. This protocol ensures that data is reliably delivered in-order without missing data or duplicate data.
 -->
+This is a submission for the homeexam for candidate 105. The project is a simple reliable data transfer protocol, that provides reliable data delivery on top of UDP. This protocol ensures that data is reliably delivered in-order without missing data or duplicate data.
+
 
 ## Files
 
@@ -53,3 +54,4 @@ python3  ./application.py  -c  -f <filename> -w 10
 
 
 The application was written in Python 3.12
+
